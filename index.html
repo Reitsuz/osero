@@ -1,0 +1,836 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NEON REVERSI - Cyber AI Engine</title>
+  <style>
+    :root {
+      --bg-color: #05050d;
+      --panel-bg: rgba(12, 12, 28, 0.75);
+      --neon-cyan: #00f3ff;
+      --neon-pink: #ff007f;
+      --neon-purple: #9d00ff;
+      --neon-green: #00ff66;
+      --neon-yellow: #ffe600;
+      --grid-line: rgba(0, 243, 255, 0.25);
+      --grid-line-glow: rgba(0, 243, 255, 0.6);
+      --font-family: 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+      user-select: none;
+      -webkit-user-select: none;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg-color);
+      color: #fff;
+      font-family: var(--font-family);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      overflow-x: hidden;
+      background-image: 
+        radial-gradient(circle at 50% 30%, rgba(157, 0, 255, 0.15), transparent 70%),
+        linear-gradient(to bottom, #030308 0%, #08081a 100%);
+    }
+
+    /* Ambient Background Grid */
+    .bg-grid {
+      position: fixed;
+      top: 0; left: 0; width: 100vw; height: 100vh;
+      background-size: 50px 50px;
+      background-image: 
+        linear-gradient(to right, rgba(0, 243, 255, 0.03) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(0, 243, 255, 0.03) 1px, transparent 1px);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    header {
+      z-index: 10;
+      text-align: center;
+      margin-bottom: 12px;
+    }
+
+    h1 {
+      font-size: 2.2rem;
+      letter-spacing: 4px;
+      color: #fff;
+      text-transform: uppercase;
+      text-shadow: 
+        0 0 5px #fff,
+        0 0 10px var(--neon-cyan),
+        0 0 20px var(--neon-cyan),
+        0 0 40px var(--neon-purple);
+      animation: pulseGlow 3s infinite alternate;
+    }
+
+    @keyframes pulseGlow {
+      0% { text-shadow: 0 0 5px #fff, 0 0 10px var(--neon-cyan), 0 0 20px var(--neon-cyan), 0 0 40px var(--neon-purple); }
+      100% { text-shadow: 0 0 7px #fff, 0 0 15px var(--neon-pink), 0 0 25px var(--neon-pink), 0 0 50px var(--neon-purple); }
+    }
+
+    /* Game Layout Container */
+    .game-container {
+      position: relative;
+      z-index: 10;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+      max-width: 100vw;
+      padding: 10px;
+    }
+
+    .status-bar {
+      width: 100%;
+      max-width: 500px;
+      background: var(--panel-bg);
+      border: 1px solid var(--neon-cyan);
+      box-shadow: 0 0 10px rgba(0, 243, 255, 0.3), inset 0 0 10px rgba(0, 243, 255, 0.1);
+      border-radius: 8px;
+      padding: 10px 18px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      backdrop-filter: blur(5px);
+    }
+
+    .turn-indicator {
+      font-size: 0.95rem;
+      font-weight: bold;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .turn-badge {
+      padding: 4px 12px;
+      border-radius: 4px;
+      font-size: 0.85rem;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .turn-badge.player {
+      background: rgba(0, 243, 255, 0.2);
+      border: 1px solid var(--neon-cyan);
+      color: var(--neon-cyan);
+      box-shadow: 0 0 8px var(--neon-cyan);
+    }
+
+    .turn-badge.ai {
+      background: rgba(255, 0, 127, 0.2);
+      border: 1px solid var(--neon-pink);
+      color: var(--neon-pink);
+      box-shadow: 0 0 8px var(--neon-pink);
+    }
+
+    .ai-thinking {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--neon-pink);
+      box-shadow: 0 0 8px var(--neon-pink);
+      animation: blink 0.8s infinite alternate;
+    }
+
+    @keyframes blink {
+      0% { opacity: 0.2; transform: scale(0.8); }
+      100% { opacity: 1; transform: scale(1.2); }
+    }
+
+    .score-board {
+      display: flex;
+      gap: 15px;
+      font-weight: bold;
+      font-size: 0.95rem;
+    }
+
+    .score-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .score-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+    }
+
+    .score-dot.player {
+      background: var(--neon-cyan);
+      box-shadow: 0 0 8px var(--neon-cyan);
+    }
+
+    .score-dot.ai {
+      background: var(--neon-pink);
+      box-shadow: 0 0 8px var(--neon-pink);
+    }
+
+    .controls {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    select, button {
+      background: rgba(0, 0, 0, 0.6);
+      border: 1px solid var(--neon-cyan);
+      color: var(--neon-cyan);
+      padding: 6px 12px;
+      font-size: 0.85rem;
+      font-weight: bold;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      text-shadow: 0 0 4px var(--neon-cyan);
+      box-shadow: 0 0 5px rgba(0, 243, 255, 0.2);
+      outline: none;
+    }
+
+    select option {
+      background: #08081a;
+      color: var(--neon-cyan);
+    }
+
+    button:hover, select:hover {
+      background: var(--neon-cyan);
+      color: #000;
+      box-shadow: 0 0 15px var(--neon-cyan);
+      text-shadow: none;
+    }
+
+    /* Main Board Frame */
+    .board-frame {
+      position: relative;
+      padding: 12px;
+      background: rgba(10, 10, 25, 0.85);
+      border: 2px solid var(--neon-cyan);
+      border-radius: 10px;
+      box-shadow: 
+        0 0 20px rgba(0, 243, 255, 0.3),
+        inset 0 0 15px rgba(0, 243, 255, 0.2);
+      backdrop-filter: blur(8px);
+    }
+
+    .othello-board {
+      display: grid;
+      grid-template-columns: repeat(8, 52px);
+      grid-template-rows: repeat(8, 52px);
+      gap: 2px;
+      background-color: var(--grid-line);
+      border: 1px solid var(--neon-cyan);
+      box-shadow: 0 0 10px var(--grid-line-glow);
+    }
+
+    .cell {
+      background-color: rgba(5, 5, 18, 0.95);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      position: relative;
+      cursor: pointer;
+      transition: background-color 0.2s;
+    }
+
+    .cell:hover {
+      background-color: rgba(0, 243, 255, 0.08);
+    }
+
+    .cell.last-move {
+      background-color: rgba(157, 0, 255, 0.25);
+    }
+
+    /* Movable indicator dot */
+    .cell.movable::after {
+      content: '';
+      position: absolute;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: var(--neon-green);
+      box-shadow: 0 0 10px var(--neon-green);
+      opacity: 0.7;
+      pointer-events: none;
+      animation: pulseMove 1.5s infinite alternate;
+    }
+
+    @keyframes pulseMove {
+      0% { transform: scale(0.8); opacity: 0.5; }
+      100% { transform: scale(1.1); opacity: 0.9; }
+    }
+
+    /* 3D Discs with flip effect */
+    .disc-container {
+      width: 42px;
+      height: 42px;
+      perspective: 1000px;
+    }
+
+    .disc {
+      width: 100%;
+      height: 100%;
+      position: relative;
+      transform-style: preserve-3d;
+      transition: transform 0.4s cubic-bezier(0.4, 0.2, 0.2, 1);
+      border-radius: 50%;
+    }
+
+    .disc.player {
+      transform: rotateY(0deg);
+    }
+
+    .disc.ai {
+      transform: rotateY(180deg);
+    }
+
+    .disc-side {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      border-radius: 50%;
+      backface-visibility: hidden;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    /* Cyan side (Player) */
+    .disc-side.cyan {
+      background: radial-gradient(circle at 30% 30%, #a6f9ff, #00f3ff 60%, #0088cc);
+      border: 1px solid var(--neon-cyan);
+      box-shadow: 0 0 12px var(--neon-cyan), inset 0 0 8px rgba(255, 255, 255, 0.8);
+    }
+
+    /* Pink side (AI) */
+    .disc-side.pink {
+      background: radial-gradient(circle at 30% 30%, #ff80bf, #ff007f 60%, #99004d);
+      border: 1px solid var(--neon-pink);
+      box-shadow: 0 0 12px var(--neon-pink), inset 0 0 8px rgba(255, 255, 255, 0.8);
+      transform: rotateY(180deg);
+    }
+
+    /* Modals */
+    .modal-overlay {
+      position: fixed;
+      top: 0; left: 0; width: 100vw; height: 100vh;
+      background: rgba(0, 0, 0, 0.75);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 100;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.25s ease;
+      backdrop-filter: blur(4px);
+    }
+
+    .modal-overlay.active {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .modal-content {
+      background: #090918;
+      border: 2px solid var(--neon-cyan);
+      box-shadow: 0 0 30px var(--neon-cyan);
+      border-radius: 10px;
+      padding: 25px;
+      text-align: center;
+      max-width: 320px;
+      width: 90%;
+    }
+
+    .gameover-title {
+      font-size: 1.6rem;
+      color: var(--neon-cyan);
+      text-shadow: 0 0 10px var(--neon-cyan);
+      margin-bottom: 10px;
+    }
+
+    .modal-btn {
+      padding: 10px 20px;
+      font-size: 1rem;
+      border-radius: 5px;
+      cursor: pointer;
+      border: 1px solid var(--neon-cyan);
+      background: transparent;
+      color: var(--neon-cyan);
+      text-shadow: 0 0 5px var(--neon-cyan);
+      transition: all 0.2s;
+    }
+
+    .modal-btn:hover {
+      background: var(--neon-cyan);
+      color: #000;
+      box-shadow: 0 0 15px var(--neon-cyan);
+    }
+
+    @media (max-width: 500px) {
+      .othello-board {
+        grid-template-columns: repeat(8, 40px);
+        grid-template-rows: repeat(8, 40px);
+      }
+      .disc-container {
+        width: 32px;
+        height: 32px;
+      }
+      h1 {
+        font-size: 1.6rem;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="bg-grid"></div>
+
+  <header>
+    <h1>NEON REVERSI</h1>
+  </header>
+
+  <div class="game-container">
+    <div class="status-bar">
+      <div class="turn-indicator">
+        <div id="turn-badge" class="turn-badge player">YOU (CYAN)</div>
+      </div>
+      <div class="score-board">
+        <div class="score-item"><div class="score-dot player"></div><span id="score-player">2</span></div>
+        <div class="score-item"><div class="score-dot ai"></div><span id="score-ai">2</span></div>
+      </div>
+      <div class="controls">
+        <select id="ai-depth">
+          <option value="3">AI: 初級</option>
+          <option value="5">AI: 中級</option>
+          <option value="7" selected>AI: 上級 (ガチ強)</option>
+        </select>
+        <button id="btn-restart">RESET</button>
+      </div>
+    </div>
+
+    <div class="board-frame">
+      <div class="othello-board" id="board"></div>
+    </div>
+  </div>
+
+  <!-- Game Over Dialog -->
+  <div class="modal-overlay" id="gameover-modal">
+    <div class="modal-content">
+      <div class="gameover-title" id="gameover-winner">YOU WIN!</div>
+      <p style="margin-bottom: 20px; color: #aaa;" id="gameover-score">CYAN 32 - 32 PINK</p>
+      <button class="modal-btn" id="btn-gameover-restart">NEW GAME</button>
+    </div>
+  </div>
+
+  <script>
+    /**
+     * Cyber Audio Effects
+     */
+    class CyberAudio {
+      constructor() { this.ctx = null; }
+      init() {
+        if (!this.ctx) {
+          this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+      }
+      playMove() {
+        this.init(); if (!this.ctx) return;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(440, this.ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(880, this.ctx.currentTime + 0.08);
+        gain.gain.setValueAtTime(0.2, this.ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.08);
+        osc.connect(gain); gain.connect(this.ctx.destination);
+        osc.start(); osc.stop(this.ctx.currentTime + 0.08);
+      }
+      playFlip() {
+        this.init(); if (!this.ctx) return;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(600, this.ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(300, this.ctx.currentTime + 0.1);
+        gain.gain.setValueAtTime(0.15, this.ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.1);
+        osc.connect(gain); gain.connect(this.ctx.destination);
+        osc.start(); osc.stop(this.ctx.currentTime + 0.1);
+      }
+      playPass() {
+        this.init(); if (!this.ctx) return;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(200, this.ctx.currentTime);
+        osc.frequency.linearRampToValueAtTime(150, this.ctx.currentTime + 0.2);
+        gain.gain.setValueAtTime(0.2, this.ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.2);
+        osc.connect(gain); gain.connect(this.ctx.destination);
+        osc.start(); osc.stop(this.ctx.currentTime + 0.2);
+      }
+    }
+
+    const audio = new CyberAudio();
+
+    const EMPTY = 0;
+    const PLAYER = 1; // Cyan
+    const AI = -1;    // Pink
+
+    const DIRS = [
+      [-1, -1], [-1, 0], [-1, 1],
+      [ 0, -1],          [ 0, 1],
+      [ 1, -1], [ 1, 0], [ 1, 1]
+    ];
+
+    // High level evaluation matrix for Othello positional strategy
+    const EVAL_WEIGHTS = [
+      [ 120, -20,  20,   5,   5,  20, -20, 120],
+      [-20,  -40,  -5,  -5,  -5,  -5, -40, -20],
+      [  20,  -5,   15,   3,   3,  15,  -5,  20],
+      [   5,  -5,    3,   3,   3,   3,  -5,   5],
+      [   5,  -5,    3,   3,   3,   3,  -5,   5],
+      [  20,  -5,   15,   3,   3,  15,  -5,  20],
+      [-20,  -40,  -5,  -5,  -5,  -5, -40, -20],
+      [ 120, -20,  20,   5,   5,  20, -20, 120]
+    ];
+
+    class OthelloGame {
+      constructor() {
+        this.board = Array(8).fill(null).map(() => Array(8).fill(EMPTY));
+        this.turn = PLAYER;
+        this.lastMove = null;
+        this.isGameOver = false;
+        this.initBoard();
+      }
+
+      initBoard() {
+        this.board = Array(8).fill(null).map(() => Array(8).fill(EMPTY));
+        this.board[3][3] = AI;     this.board[3][4] = PLAYER;
+        this.board[4][3] = PLAYER; this.board[4][4] = AI;
+        this.turn = PLAYER;
+        this.lastMove = null;
+        this.isGameOver = false;
+      }
+
+      isValidCoord(r, c) { return r >= 0 && r < 8 && c >= 0 && c < 8; }
+
+      getFlips(board, r, c, color) {
+        if (board[r][c] !== EMPTY) return [];
+        const opponent = -color;
+        let totalFlips = [];
+
+        for (let [dr, dc] of DIRS) {
+          let stepR = r + dr;
+          let stepC = c + dc;
+          let candidateFlips = [];
+
+          while (this.isValidCoord(stepR, stepC) && board[stepR][stepC] === opponent) {
+            candidateFlips.push({ r: stepR, c: stepC });
+            stepR += dr;
+            stepC += dc;
+          }
+
+          if (this.isValidCoord(stepR, stepC) && board[stepR][stepC] === color && candidateFlips.length > 0) {
+            totalFlips = totalFlips.concat(candidateFlips);
+          }
+        }
+        return totalFlips;
+      }
+
+      getValidMoves(board, color) {
+        const moves = [];
+        for (let r = 0; r < 8; r++) {
+          for (let c = 0; c < 8; c++) {
+            const flips = this.getFlips(board, r, c, color);
+            if (flips.length > 0) {
+              moves.push({ r, c, flips });
+            }
+          }
+        }
+        return moves;
+      }
+
+      makeMove(r, c) {
+        const flips = this.getFlips(this.board, r, c, this.turn);
+        if (flips.length === 0) return false;
+
+        this.board[r][c] = this.turn;
+        for (let f of flips) {
+          this.board[f.r][f.c] = this.turn;
+        }
+
+        this.lastMove = { r, c };
+        audio.playMove();
+        if (flips.length > 0) setTimeout(() => audio.playFlip(), 100);
+
+        this.switchTurn();
+        return true;
+      }
+
+      switchTurn() {
+        const nextTurn = -this.turn;
+        const nextMoves = this.getValidMoves(this.board, nextTurn);
+
+        if (nextMoves.length > 0) {
+          this.turn = nextTurn;
+        } else {
+          // Pass turn
+          const currentMoves = this.getValidMoves(this.board, this.turn);
+          if (currentMoves.length === 0) {
+            this.isGameOver = true;
+            this.endGame();
+            return;
+          } else {
+            audio.playPass();
+          }
+        }
+
+        render();
+
+        if (this.turn === AI && !this.isGameOver) {
+          setTimeout(triggerAIMove, 300);
+        }
+      }
+
+      getScore() {
+        let p = 0, a = 0;
+        for (let r = 0; r < 8; r++) {
+          for (let c = 0; c < 8; c++) {
+            if (this.board[r][c] === PLAYER) p++;
+            else if (this.board[r][c] === AI) a++;
+          }
+        }
+        return { player: p, ai: a };
+      }
+
+      endGame() {
+        const score = this.getScore();
+        let title = '';
+        if (score.player > score.ai) title = 'YOU WIN!';
+        else if (score.ai > score.player) title = 'AI WINS!';
+        else title = 'DRAW GAME!';
+
+        document.getElementById('gameover-winner').textContent = title;
+        document.getElementById('gameover-score').textContent = `CYAN ${score.player} - ${score.ai} PINK`;
+        gameoverModal.classList.add('active');
+      }
+    }
+
+    /**
+     * Advanced Minimax AI Engine with Mobility & Corner/Positional Evaluation
+     */
+    class AIPlayer {
+      evaluateBoard(board) {
+        let positionalScore = 0;
+        let pDiscs = 0, aDiscs = 0;
+
+        for (let r = 0; r < 8; r++) {
+          for (let c = 0; c < 8; c++) {
+            const val = board[r][c];
+            if (val === AI) {
+              positionalScore += EVAL_WEIGHTS[r][c];
+              aDiscs++;
+            } else if (val === PLAYER) {
+              positionalScore -= EVAL_WEIGHTS[r][c];
+              pDiscs++;
+            }
+          }
+        }
+
+        // Mobility advantage
+        const aiMoves = game.getValidMoves(board, AI).length;
+        const playerMoves = game.getValidMoves(board, PLAYER).length;
+        const mobilityScore = (aiMoves - playerMoves) * 15;
+
+        // Total evaluation score
+        return positionalScore + mobilityScore;
+      }
+
+      cloneBoard(board) {
+        return board.map(row => [...row]);
+      }
+
+      minimax(board, depth, alpha, beta, isMaximizing) {
+        const color = isMaximizing ? AI : PLAYER;
+        const moves = game.getValidMoves(board, color);
+
+        if (depth === 0 || (moves.length === 0 && game.getValidMoves(board, -color).length === 0)) {
+          return { score: this.evaluateBoard(board) };
+        }
+
+        if (moves.length === 0) {
+          // Pass node
+          return this.minimax(board, depth - 1, alpha, beta, !isMaximizing);
+        }
+
+        let bestMove = moves[0];
+
+        if (isMaximizing) {
+          let maxEval = -Infinity;
+          for (let move of moves) {
+            const nextBoard = this.cloneBoard(board);
+            nextBoard[move.r][move.c] = AI;
+            for (let f of move.flips) nextBoard[f.r][f.c] = AI;
+
+            const evaluation = this.minimax(nextBoard, depth - 1, alpha, beta, false).score;
+            if (evaluation > maxEval) {
+              maxEval = evaluation;
+              bestMove = move;
+            }
+            alpha = Math.max(alpha, evaluation);
+            if (beta <= alpha) break;
+          }
+          return { score: maxEval, move: bestMove };
+        } else {
+          let minEval = Infinity;
+          for (let move of moves) {
+            const nextBoard = this.cloneBoard(board);
+            nextBoard[move.r][move.c] = PLAYER;
+            for (let f of move.flips) nextBoard[f.r][f.c] = PLAYER;
+
+            const evaluation = this.minimax(nextBoard, depth - 1, alpha, beta, true).score;
+            if (evaluation < minEval) {
+              minEval = evaluation;
+              bestMove = move;
+            }
+            beta = Math.min(beta, evaluation);
+            if (beta <= alpha) break;
+          }
+          return { score: minEval, move: bestMove };
+        }
+      }
+
+      getBestMove(depth) {
+        const result = this.minimax(game.board, depth, -Infinity, Infinity, true);
+        return result.move;
+      }
+    }
+
+    const game = new OthelloGame();
+    const ai = new AIPlayer();
+
+    // DOM Elements
+    const boardEl = document.getElementById('board');
+    const turnBadgeEl = document.getElementById('turn-badge');
+    const scorePlayerEl = document.getElementById('score-player');
+    const scoreAIEl = document.getElementById('score-ai');
+    const gameoverModal = document.getElementById('gameover-modal');
+    const aiDepthSelect = document.getElementById('ai-depth');
+
+    function createBoardUI() {
+      boardEl.innerHTML = '';
+      for (let r = 0; r < 8; r++) {
+        for (let c = 0; c < 8; c++) {
+          const cell = document.createElement('div');
+          cell.className = 'cell';
+          cell.dataset.row = r;
+          cell.dataset.col = c;
+          cell.addEventListener('click', () => handleCellClick(r, c));
+          boardEl.appendChild(cell);
+        }
+      }
+    }
+
+    function render() {
+      // Turn Badge Status
+      if (game.turn === PLAYER) {
+        turnBadgeEl.className = 'turn-badge player';
+        turnBadgeEl.innerHTML = 'YOU (CYAN)';
+      } else {
+        turnBadgeEl.className = 'turn-badge ai';
+        turnBadgeEl.innerHTML = 'AI THINKS <span class="ai-thinking"></span>';
+      }
+
+      // Scores
+      const scores = game.getScore();
+      scorePlayerEl.textContent = scores.player;
+      scoreAIEl.textContent = scores.ai;
+
+      const validMoves = game.turn === PLAYER ? game.getValidMoves(game.board, PLAYER) : [];
+
+      const cells = boardEl.children;
+      for (let r = 0; r < 8; r++) {
+        for (let c = 0; c < 8; c++) {
+          const idx = r * 8 + c;
+          const cell = cells[idx];
+          const val = game.board[r][c];
+
+          cell.className = 'cell';
+
+          if (game.lastMove && game.lastMove.r === r && game.lastMove.c === c) {
+            cell.classList.add('last-move');
+          }
+
+          // Highlight movable target
+          if (validMoves.some(m => m.r === r && m.c === c)) {
+            cell.classList.add('movable');
+          }
+
+          // Disc Rendering with 3D animation
+          let container = cell.querySelector('.disc-container');
+          if (val !== EMPTY) {
+            if (!container) {
+              container = document.createElement('div');
+              container.className = 'disc-container';
+              container.innerHTML = `
+                <div class="disc">
+                  <div class="disc-side cyan"></div>
+                  <div class="disc-side pink"></div>
+                </div>
+              `;
+              cell.appendChild(container);
+            }
+            const disc = container.querySelector('.disc');
+            disc.className = `disc ${val === PLAYER ? 'player' : 'ai'}`;
+          } else if (container) {
+            cell.removeChild(container);
+          }
+        }
+      }
+    }
+
+    function handleCellClick(r, c) {
+      if (game.turn !== PLAYER || game.isGameOver) return;
+      game.makeMove(r, c);
+    }
+
+    function triggerAIMove() {
+      if (game.isGameOver) return;
+      const depth = parseInt(aiDepthSelect.value, 10);
+      const move = ai.getBestMove(depth);
+
+      if (move) {
+        game.makeMove(move.r, move.c);
+      }
+    }
+
+    document.getElementById('btn-restart').addEventListener('click', restartGame);
+    document.getElementById('btn-gameover-restart').addEventListener('click', () => {
+      gameoverModal.classList.remove('active');
+      restartGame();
+    });
+
+    function restartGame() {
+      game.initBoard();
+      render();
+    }
+
+    createBoardUI();
+    render();
+  </script>
+</body>
+</html>
